@@ -2,7 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { CreateFarmDto } from './dto/create-farm.dto';
 import { UpdateFarmDto } from './dto/update-farm.dto';
 import { PrismaService } from 'src/PrismaService/prisma.service';
-import { Farm, Prisma, Device, InputModuleMeterValue } from '@prisma/client';
+import {
+  Farm,
+  Prisma,
+  Device,
+  InputModuleMeterValue,
+  InputModule,
+} from '@prisma/client';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class FarmService {
@@ -23,9 +30,9 @@ export class FarmService {
       cursor,
       where,
       orderBy,
-      include
+      include,
     });
-    return result
+    return result;
   }
 
   async findAllDevice(params: {
@@ -43,11 +50,10 @@ export class FarmService {
       cursor,
       where,
       orderBy,
-      include
+      include,
     });
-    return result
+    return result;
   }
-
 
   async findMeterModuleSensorValue(params: {
     skip?: number;
@@ -62,8 +68,32 @@ export class FarmService {
       take,
       cursor,
       where,
-      orderBy
+      orderBy,
     });
-    return result
+    return result;
   }
+
+  async findInputModule(params: {
+    skip?: number;
+    take?: number;
+    cursor?: Prisma.InputModuleWhereUniqueInput;
+    where?: Prisma.InputModuleWhereInput;
+    orderBy?: Prisma.InputModuleOrderByWithRelationInput;
+  }): Promise<InputModule[]> {
+    const { skip, take, cursor, where, orderBy } = params;
+    const result = await this.prisma.inputModule.findMany({
+      skip,
+      take,
+      cursor,
+      where,
+      orderBy,
+    });
+    return result;
+  }
+
+  // async findInputModules(where: Prisma.InputModuleWhereUniqueInput) {
+  //   const result = await this.prisma.inputModule.findUnique({ where });
+  //   if (!result) return null;
+  //   return result;
+  // }
 }
