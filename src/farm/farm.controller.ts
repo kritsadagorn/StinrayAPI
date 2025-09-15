@@ -114,11 +114,11 @@ export class FarmController {
       // 1) หาแถวล่าสุด (1 แถว)
       const latestOne = await this.farmService.findMeterModuleSensorValue({
         where: baseWhere,
-        orderBy: { valueTimestamp: 'desc' },
+        orderBy: { createdAt: 'desc' },
         take: 1,
       });
 
-      const latestTs = (latestOne?.[0]?.valueTimestamp ?? null) as Date | null;
+      const latestTs = (latestOne?.[0]?.createdAt ?? null) as Date | null;
       if (!latestTs) {
         console.warn('[SKEWED] no latest row found for', { mId, iId, dev });
         return [];
@@ -141,7 +141,7 @@ export class FarmController {
         const start = end.add(-amount, unit);
         const where: Prisma.InputModuleMeterValueWhereInput = {
           ...baseWhere,
-          valueTimestamp: { gte: start.toDate(), lte: end.toDate() },
+          createdAt: { gte: start.toDate(), lte: end.toDate() },
         };
 
         result = await this.farmService.findMeterModuleSensorValue({
