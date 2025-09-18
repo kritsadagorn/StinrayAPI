@@ -385,7 +385,6 @@ export class FarmService {
       throw new NotFoundException(
         'สูตรนี้ไม่ได้ถูกผูกกับกลุ่มใด (FormulaOnGroup)',
       );
-
     const chainAll = await this.prisma.formulaOnGroup.findMany({
       where: { group: link.group, enable: true },
       orderBy: { sequence: 'asc' },

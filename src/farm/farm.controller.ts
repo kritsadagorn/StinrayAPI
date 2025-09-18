@@ -151,7 +151,6 @@ export class FarmController {
       throw new BadRequestException('device, moduleId, inputId are required');
     }
 
-    // ----- resolve time window (ของเดิม) -----
     const nowMs = Date.now();
     let startAt: Date;
     let endAt: Date;
@@ -178,7 +177,7 @@ export class FarmController {
     const maxPoints = Math.max(100, Math.min(5000, q.maxPoints ?? 1200));
     const timeoutMs = Math.max(500, Math.min(15000, q.timeoutMs ?? 6000));
 
-    // ----- เพิ่มโหมด "คำนวณสูตร" เมื่อมี computeFormulaId -----
+    // ----- เพิ่ม"คำนวณสูตร" เมื่อมี computeFormulaId -----
     if (q.computeFormulaId) {
       const seriesRaw = await this.farmService.getGraphSeries({
         moduleId,
@@ -197,9 +196,9 @@ export class FarmController {
       );
 
       return {
-        series: seriesRaw, // ⚠️ คงชื่อเดิมไว้เพื่อความเข้ากันได้ย้อนหลัง
-        seriesRaw, // ชื่อชัดเจน
-        seriesComputed, // เส้นคำนวณแล้ว
+        series: seriesRaw,
+        seriesRaw, 
+        seriesComputed,
         meta: {
           device,
           moduleId,
@@ -211,7 +210,7 @@ export class FarmController {
       };
     }
 
-    // ----- โหมดเดิม: ไม่คำนวณ -----
+    // ----- ไม่คำนวณสูตร -----
     const series = await this.farmService.getGraphSeries({
       moduleId,
       inputId,
