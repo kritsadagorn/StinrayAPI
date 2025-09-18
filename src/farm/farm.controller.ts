@@ -93,6 +93,54 @@ export class FarmController {
     return setDataDevice;
   }
 
+  // @Get('graph')
+  // async getGraph(@Query() q: QueryGraphValueDto) {
+  //   const moduleId = Number(q.moduleId);
+  //   const inputId = Number(q.inputId);
+  //   const device = String(q.device || '').trim();
+
+  //   if (!device || !Number.isFinite(moduleId) || !Number.isFinite(inputId)) {
+  //     throw new BadRequestException('device, moduleId, inputId are required');
+  //   }
+
+  //   // resolve time window
+  //   const nowMs = Date.now();
+  //   let startAt: Date;
+  //   let endAt: Date;
+
+  //   if (q.before) {
+  //     const ms = PRESET_MS[q.before];
+  //     if (!ms) throw new BadRequestException('Invalid preset in "before"');
+  //     endAt = new Date(nowMs);
+  //     startAt = new Date(nowMs - ms);
+  //   } else {
+  //     if (!q.start || !q.end)
+  //       throw new BadRequestException(
+  //         'start and end are required for custom mode',
+  //       );
+  //     const s = Date.parse(q.start);
+  //     const e = Date.parse(q.end);
+  //     if (!Number.isFinite(s) || !Number.isFinite(e))
+  //       throw new BadRequestException('Invalid start/end datetime');
+  //     if (s >= e) throw new BadRequestException('start must be < end');
+  //     startAt = new Date(s);
+  //     endAt = new Date(e);
+  //   }
+
+  //   const maxPoints = Math.max(100, Math.min(5000, q.maxPoints ?? 1200));
+  //   const timeoutMs = Math.max(500, Math.min(15000, q.timeoutMs ?? 6000));
+
+  //   return this.farmService.getGraphSeries({
+  //     moduleId,
+  //     inputId,
+  //     device,
+  //     startAt,
+  //     endAt,
+  //     maxPoints,
+  //     timeoutMs,
+  //   });
+  // }
+
   @Get('graph')
   async getGraph(@Query() q: QueryGraphValueDto) {
     const moduleId = Number(q.moduleId);
@@ -103,7 +151,7 @@ export class FarmController {
       throw new BadRequestException('device, moduleId, inputId are required');
     }
 
-    // resolve time window
+    // ----- resolve time window (ของเดิม) -----
     const nowMs = Date.now();
     let startAt: Date;
     let endAt: Date;
@@ -129,6 +177,50 @@ export class FarmController {
 
     const maxPoints = Math.max(100, Math.min(5000, q.maxPoints ?? 1200));
     const timeoutMs = Math.max(500, Math.min(15000, q.timeoutMs ?? 6000));
+
+    // ----- เพิ่มโหมด "คำนวณสูตร" เมื่อมี computeFormulaId -----
+    if (q.computeFormulaId) {
+      const seriesRaw = await this.farmService.getGraphSeries({
+        moduleId,
+        inputId,
+        device,
+        startAt,
+        endAt,
+        maxPoints,
+        timeoutMs,
+      });
+
+      const seriesComputed = await this.farmService.computeSeriesWithFormula(
+        Number(q.computeFormulaId),
+        seriesRaw,
+        /* extras */ undefined, // ถ้ามีตัวแปรเสริมสำหรับสูตร ใส่ object ตรงนี้
+      );
+
+      return {
+        series: seriesRaw, // ⚠️ คงชื่อเดิมไว้เพื่อความเข้ากันได้ย้อนหลัง
+        seriesRaw, // ชื่อชัดเจน
+        seriesComputed, // เส้นคำนวณแล้ว
+        meta: {
+          device,
+          moduleId,
+          inputId,
+          computeFormulaId: Number(q.computeFormulaId),
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+        },
+      };
+    }
+
+    // ----- โหมดเดิม: ไม่คำนวณ -----
+    const series = await this.farmService.getGraphSeries({
+      moduleId,
+      inputId,
+      device,
+      startAt,
+      endAt,
+      maxPoints,
+      timeoutMs,
+    });
 
     return this.farmService.getGraphSeries({
       moduleId,

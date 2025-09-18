@@ -248,6 +248,7 @@ export class FarmService {
   }
 
   // ทุก 1 นาที
+
   // async getGraphSeries(args: GetGraphArgs): Promise<Point[]> {
   //   return this.withTimeout(this.getGraphSeriesInner(args), args.timeoutMs);
   // }
@@ -359,6 +360,7 @@ export class FarmService {
   // }
 
   // 1) ดึง chain ของสูตร (ตัดให้ถึงสูตรเป้าหมาย)
+
   async getFormulaChain(opts: {
     formulaId?: number;
     formulaName?: string;
@@ -474,5 +476,77 @@ export class FarmService {
       steps: perStep, // log ผลระหว่างทาง (มีประโยชน์มากเวลา debug)
       output: value, // ค่าสุดท้าย
     };
+  }
+
+  // คำนวณทั้ง series ด้วยสูตรเดียวกัน (เรียก computeFormulaValue รายจุด)
+  // รองรับค่า null/NaN โดยจะคืน value: null
+  async computeSeriesWithFormula(
+    formulaId: number,
+    points: Array<{ valueTimestamp: Date; value: number | null }>,
+    extras?: Record<string, any>,
+  ): Promise<
+    Array<{ valueTimestamp: Date; raw: number | null; value: number | null }>
+  > {
+    if (!Number.isFinite(formulaId))
+      throw new BadRequestException('invalid formulaId');
+    if (!Array.isArray(points) || points.length === 0) return [];
+
+    const CONCURRENCY = 8; // กันสูตรหนัก ๆ
+    const out: Array<{
+      valueTimestamp: Date;
+      raw: number | null;
+      value: number | null;
+    }> = [];
+
+    for (let i = 0; i < points.length; i += CONCURRENCY) {
+      const batch = points.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(
+        batch.map(async (p) => {
+          if (p.value == null || Number.isNaN(Number(p.value))) {
+            return {
+              valueTimestamp: p.valueTimestamp,
+              raw: p.value,
+              value: null,
+            };
+          }
+          const res = await this.computeFormulaValue({
+            formulaId,
+            input: Number(p.value),
+            extras, // ถ้าสูตรคุณต้องใช้ตัวแปรเสริม (เช่น temp/ph จากที่อื่น)
+          });
+          return {
+            valueTimestamp: p.valueTimestamp,
+            raw: p.value,
+            value: Number(res.output),
+          };
+        }),
+      );
+      out.push(...results);
+    }
+
+    return out;
+  }
+
+  async getGraphSeriesComputed(args: {
+    moduleId: number;
+    inputId: number;
+    device: string;
+    startAt: Date;
+    endAt: Date;
+    maxPoints: number;
+    timeoutMs: number;
+    formulaId: number;
+    extras?: Record<string, any>;
+  }) {
+    const seriesRaw = await this.getGraphSeries(args);
+    const seriesComputed = await this.computeSeriesWithFormula(
+      args.formulaId,
+      seriesRaw,
+      args.extras,
+    );
+
+    // เดา unit จากสูตร (ใช้ chain สุดท้ายใน computeFormulaValue ก็ได้)
+    // ที่นี่ให้ unit เป็น null ไปก่อน หรือจะเรียก getFormulaChain() มาอ่าน unit ก็ได้
+    return { seriesRaw, seriesComputed, unit: null as string | null };
   }
 }
