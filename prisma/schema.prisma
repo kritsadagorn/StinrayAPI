@@ -8,6 +8,113 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =====================
+// Logbook schema (new)
+// =====================
+
+enum LogMetricEnum {
+  ph
+  waterTemp
+  nitrite
+  nitrate
+  amonia
+  voltage
+  oxyPct
+  oxyMgL
+  note
+}
+
+enum LogOpEnum {
+  add
+  edit
+  delete
+  clear
+}
+
+// Staff users for Logbook (separate from global User)
+enum LogbookRoleEnum {
+  Admin
+  User
+}
+
+model Pond {
+  id        Int         @id @default(autoincrement())
+  name      String      @db.VarChar(100)
+  color     String?     @db.VarChar(10)
+  enabled   Boolean     @default(true)
+  order     Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  entries   LogEntry[]
+  audits    LogAudit[]
+  staff     LogbookUserPond[]
+
+  @@index([enabled])
+}
+
+model LogEntry {
+  id           Int           @id @default(autoincrement())
+  pondId       Int
+  metric       LogMetricEnum
+  valueDecimal Decimal?      @db.Decimal(12, 4)
+  note         String?
+  recordedAt   DateTime      @default(now())
+  byName       String?       @db.VarChar(120)
+  byUserId     String?       @db.VarChar(36)
+  Pond         Pond          @relation(fields: [pondId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  audits       LogAudit[]
+
+  @@index([pondId])
+  @@index([metric])
+  @@index([recordedAt])
+}
+
+model LogAudit {
+  id               Int           @id @default(autoincrement())
+  pondId           Int
+  entryId          Int?
+  metric           LogMetricEnum
+  op               LogOpEnum
+  valueDecimal     Decimal?      @db.Decimal(12, 4)
+  note             String?
+  prevValueDecimal Decimal?      @db.Decimal(12, 4)
+  prevNote         String?
+  recordedAt       DateTime      @default(now())
+  byName           String?       @db.VarChar(120)
+  byUserId         String?       @db.VarChar(36)
+  Pond             Pond          @relation(fields: [pondId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  LogEntry         LogEntry?     @relation(fields: [entryId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([pondId])
+  @@index([metric])
+  @@index([recordedAt])
+}
+
+model LogbookUser {
+  id           String             @id @default(uuid()) @db.VarChar(36)
+  username     String             @unique @db.VarChar(50)
+  passwordHash String             @db.VarChar(255)
+  nickname     String?            @db.VarChar(120)
+  avatarUrl    String?            @db.VarChar(512)
+  avatarIcon   String?            @db.VarChar(50)
+  role         LogbookRoleEnum    @default(User)
+  enabled      Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  allowedPonds LogbookUserPond[]
+}
+
+model LogbookUserPond {
+  userId  String @db.VarChar(36)
+  pondId  Int
+  createdAt DateTime @default(now())
+  user    LogbookUser @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  pond    Pond        @relation(fields: [pondId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([userId, pondId])
+  @@index([pondId])
+}
+
 model Account {
   id                String  @id
   user              String  @db.VarChar(36)

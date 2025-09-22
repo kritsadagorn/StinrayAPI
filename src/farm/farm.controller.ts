@@ -17,6 +17,8 @@ import { Device, InputModule, Prisma } from '@prisma/client';
 import dayjs from 'dayjs';
 import { NotFoundError } from 'rxjs';
 import utc from 'dayjs/plugin/utc';
+import { IsNumber, IsOptional, IsString, IsObject } from 'class-validator';
+import { Type } from 'class-transformer';
 
 dayjs.extend(utc);
 
@@ -34,9 +36,21 @@ const PRESET_MS: Record<Preset, number> = {
 };
 
 class ComputeFormulaDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   id?: number; // เช่น 25
+
+  @IsOptional()
+  @IsString()
   name?: string; // หรือ "Coffeefish.Turbidity"
+
+  @Type(() => Number)
+  @IsNumber()
   input!: number; // ค่าตัวเลขเริ่มต้น (เช่น voltage)
+
+  @IsOptional()
+  @IsObject()
   extras?: Record<string, any>; // ตัวแปรเสริม (ph, temp ฯลฯ ถ้าสูตรต้องใช้)
 }
 
