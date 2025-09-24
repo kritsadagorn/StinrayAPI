@@ -5,7 +5,9 @@ import { FarmModule } from './farm/farm.module';
 import { LogbookModule } from './logbook/logbook.module';
 
 @Module({
-  imports: [FarmModule, LogbookModule],
+  imports: [FarmModule, 
+    // LogbookModule
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

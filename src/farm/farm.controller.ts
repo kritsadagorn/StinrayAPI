@@ -9,6 +9,7 @@ import {
   Query,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { FarmService } from './farm.service';
 import { CreateFarmDto, QueryGraphValueDto } from './dto/create-farm.dto';
@@ -57,6 +58,7 @@ class ComputeFormulaDto {
 @Controller('farm')
 export class FarmController {
   constructor(private readonly farmService: FarmService) {}
+  private readonly logger = new Logger(FarmController.name);
 
   @Get()
   async findAll() {
@@ -161,6 +163,19 @@ export class FarmController {
     const inputId = Number(q.inputId);
     const device = String(q.device || '').trim();
 
+    // Log incoming request parameters for debugging
+    try {
+      this.logger.log(
+        `getGraph request - device=${device} moduleId=${moduleId} inputId=${inputId} before=${String(
+          q.before,
+        )} start=${String(q.start)} end=${String(q.end)} maxPoints=${String(
+          q.maxPoints,
+        )} computeFormulaId=${String(q.computeFormulaId)}`,
+      );
+    } catch (e) {
+      // ignore logging error
+    }
+
     if (!device || !Number.isFinite(moduleId) || !Number.isFinite(inputId)) {
       throw new BadRequestException('device, moduleId, inputId are required');
     }
@@ -175,17 +190,22 @@ export class FarmController {
       endAt = new Date(nowMs);
       startAt = new Date(nowMs - ms);
     } else {
-      if (!q.start || !q.end)
-        throw new BadRequestException(
-          'start and end are required for custom mode',
+      // If start/end are not provided, fall back to a sensible default (last 1 hour)
+      if (!q.start || !q.end) {
+        this.logger.warn(
+          `getGraph: start or end missing, falling back to 1h window for device=${device}`,
         );
-      const s = Date.parse(q.start);
-      const e = Date.parse(q.end);
-      if (!Number.isFinite(s) || !Number.isFinite(e))
-        throw new BadRequestException('Invalid start/end datetime');
-      if (s >= e) throw new BadRequestException('start must be < end');
-      startAt = new Date(s);
-      endAt = new Date(e);
+        endAt = new Date(nowMs);
+        startAt = new Date(nowMs - PRESET_MS['1h']);
+      } else {
+        const s = Date.parse(q.start);
+        const e = Date.parse(q.end);
+        if (!Number.isFinite(s) || !Number.isFinite(e))
+          throw new BadRequestException('Invalid start/end datetime');
+        if (s >= e) throw new BadRequestException('start must be < end');
+        startAt = new Date(s);
+        endAt = new Date(e);
+      }
     }
 
     const maxPoints = Math.max(100, Math.min(5000, q.maxPoints ?? 1200));
@@ -208,6 +228,14 @@ export class FarmController {
         seriesRaw,
         /* extras */ undefined, // ถ้ามีตัวแปรเสริมสำหรับสูตร ใส่ object ตรงนี้
       );
+
+      try {
+        const rawLen = Array.isArray(seriesRaw) ? seriesRaw.length : null;
+        const compLen = Array.isArray(seriesComputed) ? seriesComputed.length : null;
+        this.logger.debug(
+          `computeFormula - device=${device} moduleId=${moduleId} inputId=${inputId} seriesRaw=${rawLen} seriesComputed=${compLen}`,
+        );
+      } catch (e) {}
 
       return {
         series: seriesRaw,
@@ -234,16 +262,21 @@ export class FarmController {
       maxPoints,
       timeoutMs,
     });
+    // Log a small summary for debugging (length and sample points)
+    try {
+      const len = Array.isArray(series) ? series.length : null;
+      const first = Array.isArray(series) && series.length > 0 ? series[0] : null;
+      const last = Array.isArray(series) && series.length > 0 ? series[series.length - 1] : null;
+      this.logger.debug(
+        `getGraph result - device=${device} moduleId=${moduleId} inputId=${inputId} points=${len} first=${JSON.stringify(
+          first,
+        )} last=${JSON.stringify(last)}`,
+      );
+    } catch (e) {
+      // ignore logging errors
+    }
 
-    return this.farmService.getGraphSeries({
-      moduleId,
-      inputId,
-      device,
-      startAt,
-      endAt,
-      maxPoints,
-      timeoutMs,
-    });
+    return series;
   }
 
   // POST /farm/formula

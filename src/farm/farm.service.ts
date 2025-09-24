@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { CreateFarmDto } from './dto/create-farm.dto';
 import { UpdateFarmDto } from './dto/update-farm.dto';
@@ -45,6 +46,7 @@ type FormulaChainResponse = {
 
 @Injectable()
 export class FarmService {
+  private readonly logger = new Logger(FarmService.name);
   constructor(private prisma: PrismaService) {}
 
   async findAllfarm(params: {
@@ -166,6 +168,16 @@ export class FarmService {
           GROUP BY 1
           ORDER BY 1 ASC
         `;
+        try {
+          const len = Array.isArray(rows) ? rows.length : 0;
+          const first = len > 0 ? rows[0].ts : null;
+          const last = len > 0 ? rows[rows.length - 1].ts : null;
+          this.logger.debug(
+            `bucket query result device=${device} moduleId=${moduleId} inputId=${inputId} buckets=${len} first=${String(
+              first,
+            )} last=${String(last)}`,
+          );
+        } catch (e) {}
 
         return rows.map((r) => ({
           valueTimestamp: new Date(r.ts),
@@ -188,6 +200,17 @@ export class FarmService {
       orderBy: { valueTimestamp: 'asc' },
       select: { valueTimestamp: true, value: true },
     });
+
+    try {
+      this.logger.debug(
+        `fallback findMany result device=${device} moduleId=${moduleId} inputId=${inputId} rows=${all.length}`,
+      );
+      if (all.length > 0) {
+        const first = all[0].valueTimestamp;
+        const last = all[all.length - 1].valueTimestamp;
+        this.logger.debug(`fallback sample first=${String(first)} last=${String(last)}`);
+      }
+    } catch (e) {}
 
     if (all.length <= targetPts) {
       return all.map((r) => ({
