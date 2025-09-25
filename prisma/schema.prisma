@@ -1,7 +1,5 @@
-
 generator client {
   provider = "prisma-client-js"
-  // output   = "../generated/prisma"
 }
 
 datasource db {
@@ -9,108 +7,1262 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// =====================
-// Logbook schema (new)
-// =====================
+model Account {
+  id                String  @id
+  user              String  @db.VarChar(36)
+  type              String
+  provider          String
+  providerAccountId String
+  refreshToken      String?
+  accessToken       String?
+  expiresAt         Int?
+  tokenType         String?
+  scope             String?
+  idToken           String?
+  sessionState      String?
+  User              User    @relation(fields: [user], references: [uuid], onDelete: Cascade)
 
-enum LogMetricEnum {
-  ph
-  waterTemp
-  nitrite
-  nitrate
-  amonia
-  voltage
-  oxyPct
-  oxyMgL
-  note
+  @@unique([provider, providerAccountId])
 }
 
-enum LogOpEnum {
-  add
-  edit
-  delete
-  clear
+model Address {
+  id              Int              @id @default(autoincrement())
+  address         String?          @db.VarChar(255)
+  city            String?          @db.VarChar(100)
+  country         String?          @db.VarChar(100)
+  postalCode      String?          @db.VarChar(20)
+  location        Json?
+  createdAt       DateTime         @default(now())
+  weather         Int?
+  OpenWeatherData OpenWeatherData? @relation(fields: [weather], references: [cityId])
+  Farm            Farm[]
+  Organization    Organization[]
 }
 
-enum LogbookRoleEnum {
-  Admin
+model Billing {
+  id           Int           @id @default(autoincrement())
+  user         String        @db.VarChar(36)
+  subscription Int?
+  amount       Int
+  paymentDate  DateTime
+  createdAt    DateTime      @default(now())
+  unit         String?       @db.VarChar(4)
+  discount     Int           @default(0)
+  Subscription Subscription? @relation(fields: [subscription], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  CurrencyUnit CurrencyUnit? @relation(fields: [unit], references: [id], onUpdate: NoAction)
+  User         User          @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+  Invoice      Invoice[]
+}
+
+model CategoriesOnFormulaGroup {
+  group        Int
+  category     String       @db.VarChar(24)
+  createdAt    DateTime     @default(now())
+  Category     Category     @relation(fields: [category], references: [id])
+  FormulaGroup FormulaGroup @relation(fields: [group], references: [id])
+
+  @@id([group, category])
+}
+
+model CategoriesOnFormulas {
+  formula   Int
+  category  String   @db.VarChar(24)
+  createdAt DateTime @default(now())
+  Category  Category @relation(fields: [category], references: [id])
+  Formula   Formula  @relation(fields: [formula], references: [id])
+
+  @@id([formula, category])
+}
+
+model Category {
+  id                       String                     @id @db.VarChar(24)
+  name                     String                     @unique
+  parent                   String?
+  description              String?
+  slug                     String                     @unique
+  CategoriesOnFormulaGroup CategoriesOnFormulaGroup[]
+  CategoriesOnFormulas     CategoriesOnFormulas[]
+  Category                 Category?                  @relation("CategoryToCategory", fields: [parent], references: [id], onUpdate: NoAction)
+  other_Category           Category[]                 @relation("CategoryToCategory")
+}
+
+model CurrencyUnit {
+  id           String         @id @db.VarChar(4)
+  name         String         @db.VarChar(20)
+  createdAt    DateTime       @default(now())
+  Billing      Billing[]
+  Invoice      Invoice[]
+  Subscription Subscription[]
+}
+
+model Device {
+  id                      String                    @id @db.VarChar(50)
+  qrcode                  String?                   @unique @db.VarChar(50)
+  serialNumber            String                    @db.VarChar(50)
+  protocol                String?                   @db.VarChar(255)
+  vendor                  String?                   @db.VarChar(50)
+  model                   String?                   @db.VarChar(50)
+  type                    DeviceTypeEnum            @default(MASTER_BOARD)
+  firmwareVersion         String?                   @db.VarChar(50)
+  firmwareUpdateTimestamp DateTime?
+  lastHeartbeatTimestamp  DateTime?
+  registrationStatus      RegistrationStatusEnum    @default(Accepted)
+  firmwareUpdateStatus    FirmwareUpdateStatusEnum?
+  location                Json?
+  farm                    Int?
+  plant                   Int?
+  createdAt               DateTime                  @default(now())
+  name                    String?                   @db.VarChar(100)
+  localIP                 String?                   @db.VarChar(50)
+  rebootScheduleSecond    Int?                      @default(86400)
+  Farm                    Farm?                     @relation(fields: [farm], references: [id], onUpdate: NoAction)
+  DeviceModel             DeviceModel?              @relation(fields: [model], references: [id], onUpdate: NoAction)
+  Plant                   Plant?                    @relation(fields: [plant], references: [id], onUpdate: NoAction)
+  DeviceChart             DeviceChart[]
+  DeviceConfiguration     DeviceConfiguration[]
+  DeviceStatus            DeviceStatus[]
+  InputModule             InputModule[]
+  InputModuleCondition    InputModuleCondition[]
+  OutputModule            OutputModule[]
+  TaskDetail              TaskDetail[]
+
+  @@index([serialNumber])
+}
+
+model DeviceChart {
+  id                Int                 @id @default(autoincrement())
+  name              String              @db.VarChar(100)
+  device            String              @db.VarChar(50)
+  min               Float
+  max               Float
+  yAxisUnit         String              @db.VarChar(15)
+  createdAt         DateTime            @default(now())
+  Device            Device              @relation(fields: [device], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  DeviceChartSeries DeviceChartSeries[]
+}
+
+model DeviceChartSeries {
+  id            Int           @id @default(autoincrement())
+  name          String        @db.VarChar(100)
+  chart         Int
+  inputModule   Int
+  color         String        @db.VarChar(10)
+  createdAt     DateTime      @default(now())
+  enableFormula Boolean       @default(false)
+  valueFormat   Int?
+  DeviceChart   DeviceChart   @relation(fields: [chart], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  InputModule   InputModule   @relation(fields: [inputModule], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  FormulaGroup  FormulaGroup? @relation(fields: [valueFormat], references: [id], onUpdate: NoAction)
+}
+
+model DeviceConfiguration {
+  id        Int      @id @default(autoincrement())
+  device    String   @db.VarChar(50)
+  key       String   @db.VarChar(50)
+  value     String   @db.VarChar(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  readonly  Boolean  @default(true)
+  Device    Device   @relation(fields: [device], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([device, key])
+  @@index([device])
+  @@index([key])
+}
+
+model DeviceLog {
+  uniqueId          String    @id @db.VarChar(50)
+  device            String    @db.VarChar(50)
+  action            String?   @db.VarChar(50)
+  request           Json?
+  response          Json?
+  error             Json?
+  requestTimestamp  DateTime?
+  responseTimestamp DateTime?
+  errorTimestamp    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime
+
+  @@index([action])
+  @@index([createdAt])
+  @@index([device, action, createdAt])
+  @@index([device])
+  @@index([errorTimestamp])
+  @@index([requestTimestamp])
+  @@index([responseTimestamp])
+  @@index([uniqueId, device, action, createdAt])
+  @@index([uniqueId])
+}
+
+model DeviceModel {
+  id                       String                     @id @db.VarChar(50)
+  name                     String                     @db.VarChar(100)
+  createdAt                DateTime                   @default(now())
+  Device                   Device[]
+  DeviceModelConfiguration DeviceModelConfiguration[]
+}
+
+model DeviceModelConfiguration {
+  id          Int          @id @default(autoincrement())
+  model       String?      @db.VarChar(50)
+  key         String       @db.VarChar(50)
+  type        String       @db.VarChar(50)
+  value       String       @db.VarChar(100)
+  createdAt   DateTime     @default(now())
+  readonly    Boolean      @default(true)
+  DeviceModel DeviceModel? @relation(fields: [model], references: [id], onDelete: NoAction)
+}
+
+model DeviceSetupTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  data        Json
+  createdAt   DateTime @default(now())
+}
+
+model DeviceStatus {
+  id             Int       @id @default(autoincrement())
+  type           String?   @db.VarChar(50)
+  status         String    @db.VarChar(50)
+  valueTimestamp DateTime?
+  device         String    @db.VarChar(50)
+  moduleId       Int       @default(1)
+  inputId        Int?
+  outputId       Int?
+  createdAt      DateTime  @default(now())
+  Device         Device    @relation(fields: [device], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([inputId])
+  @@index([moduleId])
+  @@index([outputId])
+  @@index([status])
+  @@index([type])
+  @@index([valueTimestamp])
+}
+
+model Expense {
+  id          Int         @id @default(autoincrement())
+  transaction Int
+  createdAt   DateTime    @default(now())
+  Transaction Transaction @relation(fields: [transaction], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model Farm {
+  id                     Int                      @id @default(autoincrement())
+  name                   String                   @db.VarChar(100)
+  address                Int?
+  organization           Int?
+  logo                   Int?
+  type                   FarmTypeEnum             @default(GrowPlant)
+  createdAt              DateTime                 @default(now())
+  Device                 Device[]
+  Address                Address?                 @relation(fields: [address], references: [id], onUpdate: NoAction)
+  Media                  Media?                   @relation(fields: [logo], references: [id], onUpdate: NoAction)
+  Organization           Organization?            @relation(fields: [organization], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  FarmMember             FarmMember[]
+  FarmMemberSetting      FarmMemberSetting[]
+  FarmMemberVerification FarmMemberVerification[]
+  FarmServiceQuotas      FarmServiceQuotas[]
+  PinFarm                PinFarm[]
+  Plant                  Plant[]
+  Pole                   Pole[]
+  Transaction            Transaction[]
+  UserNotification       UserNotification[]
+}
+
+model FarmMember {
+  farm                   Int
+  user                   String                  @db.VarChar(36)
+  role                   MemberRoleEnum          @default(CanView)
+  createdAt              DateTime                @default(now())
+  isAccept               Boolean                 @default(true)
+  verification           String?                 @unique
+  Farm                   Farm                    @relation(fields: [farm], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User                   User                    @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+  FarmMemberVerification FarmMemberVerification? @relation(fields: [verification], references: [token], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([farm, user])
+}
+
+model FarmMemberSetting {
+  key       String
+  value     String
+  farm      Int
+  user      String   @db.VarChar(36)
+  updatedAt DateTime
+  createdAt DateTime @default(now())
+  Farm      Farm     @relation(fields: [farm], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User      User     @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([farm, user, key])
+}
+
+model FarmMemberVerification {
+  token                                  String                         @id
+  type                                   FarmMemberVerificationTypeEnum
+  data                                   Json
+  expires                                DateTime
+  used                                   DateTime?
+  verified                               DateTime?
+  from                                   String                         @db.VarChar(36)
+  to                                     String                         @db.VarChar(36)
+  farm                                   Int
+  createdAt                              DateTime                       @default(now())
+  FarmMember                             FarmMember?
+  Farm                                   Farm                           @relation(fields: [farm], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User_FarmMemberVerification_fromToUser User                           @relation("FarmMemberVerification_fromToUser", fields: [from], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+  User_FarmMemberVerification_toToUser   User                           @relation("FarmMemberVerification_toToUser", fields: [to], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model FarmServiceQuotas {
+  farm                 Int
+  quota                String
+  createdAt            DateTime             @default(now())
+  Farm                 Farm                 @relation(fields: [farm], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  QuotasAndSystemLimit QuotasAndSystemLimit @relation(fields: [quota], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([farm, quota])
+}
+
+model Firmware {
+  id        Int      @id @default(autoincrement())
+  model     String   @db.VarChar(50)
+  version   String   @db.VarChar(10)
+  note      String?
+  file      Int
+  createdAt DateTime @default(now())
+  Media     Media    @relation(fields: [file], references: [id], onUpdate: NoAction)
+}
+
+model Formula {
+  id                   Int                    @id @default(autoincrement())
+  name                 String                 @db.VarChar(100)
+  description          String?                @db.VarChar(255)
+  eval                 String
+  unit                 String                 @db.VarChar(50)
+  createdAt            DateTime               @default(now())
+  CategoriesOnFormulas CategoriesOnFormulas[]
+  FormulaOnGroup       FormulaOnGroup[]
+}
+
+model FormulaGroup {
+  id                       Int                        @id @default(autoincrement())
+  name                     String                     @db.VarChar(100)
+  description              String?                    @db.VarChar(255)
+  createdAt                DateTime                   @default(now())
+  exampleValue             Float?
+  unit                     String                     @db.VarChar(50)
+  yAxisMax                 Float                      @default(0.0)
+  yAxisMin                 Float                      @default(0.0)
+  CategoriesOnFormulaGroup CategoriesOnFormulaGroup[]
+  DeviceChartSeries        DeviceChartSeries[]
+  FormulaOnGroup           FormulaOnGroup[]
+  InputModule              InputModule[]
+}
+
+model FormulaOnGroup {
+  group        Int
+  formula      Int
+  sequence     Int
+  enable       Boolean      @default(true)
+  Formula      Formula      @relation(fields: [formula], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  FormulaGroup FormulaGroup @relation(fields: [group], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([group, formula, sequence])
+}
+
+model GlobalConfiguration {
+  key       String   @id @db.VarChar(100)
+  value     String   @db.VarChar(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+}
+
+model Income {
+  id          Int         @id @default(autoincrement())
+  transaction Int
+  createdAt   DateTime    @default(now())
+  Transaction Transaction @relation(fields: [transaction], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model InputModule {
+  id                   Int                    @id @default(autoincrement())
+  name                 String?                @db.VarChar(100)
+  type                 String?                @db.VarChar(50)
+  status               String?                @db.VarChar(50)
+  moduleId             Int                    @default(1)
+  inputId              Int?
+  device               String                 @db.VarChar(50)
+  createdAt            DateTime               @default(now())
+  valueFormat          Int?
+  icon                 String?                @db.VarChar(50)
+  location             Json?
+  isInternal           Boolean                @default(false)
+  DeviceChartSeries    DeviceChartSeries[]
+  Device               Device                 @relation(fields: [device], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  FormulaGroup         FormulaGroup?          @relation(fields: [valueFormat], references: [id], onUpdate: NoAction)
+  InputModuleCondition InputModuleCondition[]
+  PlantSensor          PlantSensor[]
+
+  @@unique([device, moduleId, inputId])
+}
+
+model InputModuleCondition {
+  id                         Int                     @id @default(autoincrement())
+  condition                  ConditionEnum
+  value                      Int?
+  startValue                 Int?
+  stopValue                  Int?
+  logicalOperator            LogicalOperatorEnum?
+  ref                        Int?                    @unique
+  createdAt                  DateTime                @default(now())
+  device                     String                  @db.VarChar(50)
+  input                      Int
+  refSetting                 Boolean                 @default(false)
+  Device                     Device                  @relation(fields: [device], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  InputModule                InputModule             @relation(fields: [input], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  InputModuleCondition       InputModuleCondition?   @relation("InputModuleConditionToInputModuleCondition", fields: [ref], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  other_InputModuleCondition InputModuleCondition?   @relation("InputModuleConditionToInputModuleCondition")
+  PlantMood                  PlantMood[]
+  ScheduleAndConditions      ScheduleAndConditions[]
+}
+
+model InputModuleMeterValue {
+  id             String              @id
+  device         String              @db.VarChar(50)
+  moduleId       Int?                @default(1)
+  inputId        Int?
+  type           MeterValueTypeEnum?
+  unit           String?             @db.VarChar(20)
+  valueTimestamp DateTime?
+  value          String?             @db.VarChar(20)
+  min            String?             @db.VarChar(20)
+  max            String?             @db.VarChar(20)
+  createdAt      DateTime            @default(now())
+
+  @@index([device, inputId, moduleId, valueTimestamp])
+}
+
+model Invoice {
+  id            Int           @id @default(autoincrement())
+  user          String        @db.VarChar(36)
+  billing       Int
+  invoiceNumber String
+  issuedDate    DateTime
+  dueDate       DateTime
+  amount        Int
+  createdAt     DateTime      @default(now())
+  unit          String?       @db.VarChar(4)
+  discount      Int           @default(0)
+  Billing       Billing       @relation(fields: [billing], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  CurrencyUnit  CurrencyUnit? @relation(fields: [unit], references: [id], onUpdate: NoAction)
+  User          User          @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model Media {
+  id                            Int                  @id @default(autoincrement())
+  type                          String               @db.VarChar(50)
+  key                           String?
+  filename                      String
+  path                          String
+  size                          Int
+  createdAt                     DateTime             @default(now())
+  Farm                          Farm[]
+  Firmware                      Firmware[]
+  NewsContent                   NewsContent[]
+  Organization                  Organization[]
+  Plant                         Plant[]
+  PlantActivityMedia            PlantActivityMedia[]
+  PlantYieldMedia               PlantYieldMedia[]
+  ReportResult                  ReportResult[]
+  SlideShowContent              SlideShowContent[]
+  User_User_coverImageToMedia   User[]               @relation("User_coverImageToMedia")
+  User_User_profileImageToMedia User[]               @relation("User_profileImageToMedia")
+}
+
+model ModuleSchedule {
+  id                    Int                     @id @default(autoincrement())
+  type                  ScheduleTypeEnum        @default(Day)
+  day                   Json?
+  timeSection           Json?
+  createdAt             DateTime                @default(now())
+  cron                  String?
+  ScheduleAndConditions ScheduleAndConditions[]
+}
+
+model NewsContent {
+  id              String   @id
+  title           String   @db.VarChar(255)
+  description     String
+  contentMarkdown String
+  link            String
+  image           Int?
+  createdAt       DateTime @default(now())
+  highlight       Boolean  @default(false)
+  display         Boolean  @default(true)
+  Media           Media?   @relation(fields: [image], references: [id], onUpdate: NoAction)
+}
+
+model OpenWeatherData {
+  cityId           Int       @id
+  cityName         String    @db.VarChar(100)
+  countryNameLocal String    @db.VarChar(100)
+  countryCode      String    @db.VarChar(5)
+  updatedAt        DateTime
+  createdAt        DateTime  @default(now())
+  countryName      String    @db.VarChar(100)
+  current          Json
+  forecast5Days    Json
+  currentRaw       Json
+  forecast5DaysRaw Json
+  Address          Address[]
+}
+
+model Organization {
+  id                 Int                  @id @default(autoincrement())
+  name               String               @db.VarChar(100)
+  address            Int?
+  logo               Int?
+  createdAt          DateTime             @default(now())
+  Farm               Farm[]
+  Address            Address?             @relation(fields: [address], references: [id], onUpdate: NoAction)
+  Media              Media?               @relation(fields: [logo], references: [id], onUpdate: NoAction)
+  OrganizationMember OrganizationMember[]
+  Transaction        Transaction[]
+}
+
+model OrganizationMember {
+  organization Int
+  user         String         @db.VarChar(36)
+  role         MemberRoleEnum @default(CanView)
+  createdAt    DateTime       @default(now())
+  Organization Organization   @relation(fields: [organization], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User         User           @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([organization, user])
+}
+
+model OutputModule {
+  id                     Int                     @id @default(autoincrement())
+  name                   String?                 @db.VarChar(100)
+  type                   String?                 @db.VarChar(50)
+  status                 String?                 @db.VarChar(50)
+  operationType          OperationTypeEnum       @default(Manual)
+  moduleId               Int                     @default(1)
+  outputId               Int?
+  device                 String                  @db.VarChar(50)
+  location               Json?
+  createdAt              DateTime                @default(now())
+  waitOperation          Int                     @default(0)
+  allowNextOperationDate DateTime?
+  icon                   String?                 @db.VarChar(50)
+  isValve                Boolean                 @default(false)
+  Device                 Device                  @relation(fields: [device], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  PlantControl           PlantControl[]
+  ScheduleAndConditions  ScheduleAndConditions[]
+
+  @@unique([device, moduleId, outputId])
+}
+
+model Parameter {
+  id                                               String         @id
+  type                                             String         @db.VarChar(50)
+  subType                                          String?        @db.VarChar(50)
+  def                                              String         @db.VarChar(100)
+  th                                               String?        @db.VarChar(100)
+  en                                               String?        @db.VarChar(100)
+  createdAt                                        DateTime       @default(now())
+  key                                              String?        @db.VarChar(50)
+  PlantSpecies_PlantSpecies_descriptionToParameter PlantSpecies[] @relation("PlantSpecies_descriptionToParameter")
+  PlantSpecies_PlantSpecies_titleToParameter       PlantSpecies[] @relation("PlantSpecies_titleToParameter")
+  PlantType_PlantType_descriptionToParameter       PlantType[]    @relation("PlantType_descriptionToParameter")
+  PlantType_PlantType_titleToParameter             PlantType[]    @relation("PlantType_titleToParameter")
+
+  @@index([def])
+  @@index([def, th, en])
+  @@index([en])
+  @@index([subType])
+  @@index([th])
+  @@index([type])
+  @@index([type, subType])
+}
+
+model PinFarm {
+  user String
+  farm Int
+  Farm Farm   @relation(fields: [farm], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User User   @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user, farm])
+}
+
+model PlanConfiguration {
+  id           Int          @id @default(autoincrement())
+  key          String       @db.VarChar(30)
+  type         String       @db.VarChar(10)
+  value        String       @db.VarChar(20)
+  subscription Int
+  createdAt    DateTime     @default(now())
+  Subscription Subscription @relation(fields: [subscription], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model Plant {
+  id               Int                @id @default(autoincrement())
+  name             String             @db.VarChar(100)
+  description      String?            @db.VarChar(255)
+  type             PlantTypeEnum      @default(General)
+  farm             Int?
+  geofencing       Json?
+  createdAt        DateTime           @default(now())
+  latestUpdate     DateTime?
+  area             Int?
+  areaUnit         String?            @default("m²")
+  addressData      Json?
+  coverImage       Int?
+  Device           Device[]
+  Media            Media?             @relation(fields: [coverImage], references: [id], onUpdate: NoAction)
+  Farm             Farm?              @relation(fields: [farm], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  PlantActivity    PlantActivity[]
+  PlantControl     PlantControl[]
+  PlantCrop        PlantCrop[]
+  PlantMood        PlantMood[]
+  PlantSensor      PlantSensor[]
+  PlantYield       PlantYield[]
+  Pole             Pole[]
+  UserNotification UserNotification[]
+
+  @@index([farm])
+  @@index([type])
+}
+
+model PlantActivity {
+  id                 Int                          @id @default(autoincrement())
+  startTimestamp     DateTime?
+  stopTimestamp      DateTime?
+  plant              Int
+  remark             String?                      @db.VarChar(255)
+  assignTo           String?                      @db.VarChar(36)
+  status             PlantActivityStatusEnum      @default(Pending)
+  createdAt          DateTime                     @default(now())
+  name               String                       @db.VarChar(150)
+  coordinates        Json?
+  disease            Json?
+  diseasePosition    String?                      @db.VarChar(255)
+  fertilize          Json?
+  poles              Json?
+  soilQuality        Json?
+  spray              Json?
+  stemQuality        Json?
+  valves             Json?
+  water              Json?
+  weather            Json?
+  activityType       PlantActivityTypeEnum
+  workingType        PlantActivityWorkingTypeEnum
+  control            Json?
+  sensor             Json?
+  User               User?                        @relation(fields: [assignTo], references: [uuid], onUpdate: NoAction)
+  Plant              Plant                        @relation(fields: [plant], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  PlantActivityMedia PlantActivityMedia[]
+}
+
+model PlantActivityMedia {
+  id            Int           @id @default(autoincrement())
+  activity      Int
+  media         Int
+  createdAt     DateTime      @default(now())
+  PlantActivity PlantActivity @relation(fields: [activity], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Media         Media         @relation(fields: [media], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model PlantControl {
+  plant        Int
+  output       Int
+  index        Int          @default(-1)
+  OutputModule OutputModule @relation(fields: [output], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Plant        Plant        @relation(fields: [plant], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([plant, output])
+}
+
+model PlantCrop {
+  id                Int                 @id @default(autoincrement())
+  status            PlantCropStatusEnum @default(Wait)
+  plant             Int
+  createdAt         DateTime            @default(now())
+  plantingDate      DateTime?
+  predicHarvestDate DateTime?
+  area              Int?
+  areaUnit          String?             @default("m²")
+  species           Int?
+  speciesName       String?             @db.VarChar(100)
+  type              Int?
+  typeName          String              @db.VarChar(100)
+  harvestDate       DateTime?
+  Plant             Plant               @relation(fields: [plant], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  PlantYield        PlantYield[]
+}
+
+model PlantMood {
+  id                   Int                  @id @default(autoincrement())
+  type                 PlantMoodTypeEnum
+  plant                Int
+  createdAt            DateTime             @default(now())
+  inputCondition       Int
+  emotionStyle         String               @db.VarChar(20)
+  InputModuleCondition InputModuleCondition @relation(fields: [inputCondition], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Plant                Plant                @relation(fields: [plant], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model PlantSensor {
+  plant       Int
+  input       Int
+  index       Int         @default(-1)
+  InputModule InputModule @relation(fields: [input], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Plant       Plant       @relation(fields: [plant], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([plant, input])
+}
+
+model PlantSpecies {
+  id                                            Int             @id @default(autoincrement())
+  description                                   String?
+  harvestDay                                    Int             @default(-1)
+  status                                        UsageStatusEnum @default(Activate)
+  plantType                                     Int
+  createdAt                                     DateTime        @default(now())
+  title                                         String
+  Parameter_PlantSpecies_descriptionToParameter Parameter?      @relation("PlantSpecies_descriptionToParameter", fields: [description], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  PlantType                                     PlantType       @relation(fields: [plantType], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Parameter_PlantSpecies_titleToParameter       Parameter       @relation("PlantSpecies_titleToParameter", fields: [title], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model PlantType {
+  id                                         Int             @id @default(autoincrement())
+  description                                String?
+  harvestDayDefault                          Int             @default(-1)
+  status                                     UsageStatusEnum @default(Deactivate)
+  createdAt                                  DateTime        @default(now())
+  title                                      String
+  PlantSpecies                               PlantSpecies[]
+  Parameter_PlantType_descriptionToParameter Parameter?      @relation("PlantType_descriptionToParameter", fields: [description], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Parameter_PlantType_titleToParameter       Parameter       @relation("PlantType_titleToParameter", fields: [title], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model PlantYield {
+  id              Int               @id @default(autoincrement())
+  plant           Int
+  crop            Int?
+  total           Int
+  good            Int
+  loss            Int
+  harvestDate     DateTime
+  note            String?           @db.VarChar(255)
+  createdAt       DateTime          @default(now())
+  PlantCrop       PlantCrop?        @relation(fields: [crop], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Plant           Plant             @relation(fields: [plant], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  PlantYieldMedia PlantYieldMedia[]
+}
+
+model PlantYieldMedia {
+  id         Int        @id @default(autoincrement())
+  yield      Int
+  media      Int
+  createdAt  DateTime   @default(now())
+  Media      Media      @relation(fields: [media], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  PlantYield PlantYield @relation(fields: [yield], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model Pole {
+  qrcode     String    @id @db.VarChar(30)
+  location   Json?
+  expiryDate DateTime?
+  createdAt  DateTime  @default(now())
+  plant      Int?
+  name       String?   @db.VarChar(100)
+  farm       Int?
+  Farm       Farm?     @relation(fields: [farm], references: [id], onUpdate: NoAction)
+  Plant      Plant?    @relation(fields: [plant], references: [id], onUpdate: NoAction)
+}
+
+model QuotasAdjustHistory {
+  id                   Int                  @id @default(autoincrement())
+  quota                String
+  from                 BigInt
+  to                   BigInt
+  adjuster             String?              @db.VarChar(36)
+  createdAt            DateTime             @default(now())
+  User                 User?                @relation(fields: [adjuster], references: [uuid], onDelete: NoAction, onUpdate: NoAction)
+  QuotasAndSystemLimit QuotasAndSystemLimit @relation(fields: [quota], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model QuotasAndSystemLimit {
+  id                  String                @id
+  key                 String                @db.VarChar(50)
+  type                QuotasType            @default(SystemLimit)
+  value               BigInt
+  currentUsage        BigInt                @default(0)
+  unit                String?
+  adjustable          Boolean               @default(false)
+  countTimestamp      DateTime?
+  updatedAt           DateTime
+  createdAt           DateTime              @default(now())
+  FarmServiceQuotas   FarmServiceQuotas[]
+  QuotasAdjustHistory QuotasAdjustHistory[]
+}
+
+model QuotasAndSystemLimitDefault {
+  key        String     @id @db.VarChar(50)
+  type       QuotasType
+  value      BigInt
+  unit       String?
+  adjustable Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+}
+
+model ReportRequest {
+  id           String         @id
+  type         ReportType
+  details      Json
+  begin        DateTime
+  end          DateTime
+  requester    String?        @db.VarChar(36)
+  createdAt    DateTime       @default(now())
+  status       ReportStatus   @default(Wait)
+  description  String?
+  name         String
+  User         User?          @relation(fields: [requester], references: [uuid], onDelete: NoAction, onUpdate: NoAction)
+  ReportResult ReportResult[]
+}
+
+model ReportResult {
+  id            String        @id
+  request       String
+  file          Int
+  createdAt     DateTime      @default(now())
+  Media         Media         @relation(fields: [file], references: [id], onDelete: Cascade)
+  ReportRequest ReportRequest @relation(fields: [request], references: [id], onDelete: Cascade)
+}
+
+model ScheduleAndConditions {
+  id                   Int                             @id @default(autoincrement())
+  status               ScheduleAndConditionsStatusEnum @default(Active)
+  schedule             Int?
+  output               Int
+  createdAt            DateTime                        @default(now())
+  conditionSetting     Boolean                         @default(false)
+  scheduleSetting      Boolean                         @default(false)
+  duration             Int?
+  durationUnit         DurationUnit?
+  operation            OperationEnum                   @default(Off)
+  inputCondition       Int?
+  timezone             String                          @default("Asia/Bangkok") @db.VarChar(100)
+  InputModuleCondition InputModuleCondition?           @relation(fields: [inputCondition], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  OutputModule         OutputModule                    @relation(fields: [output], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ModuleSchedule       ModuleSchedule?                 @relation(fields: [schedule], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model ServiceKey {
+  id        String   @id @db.VarChar(36)
+  service   String
+  private   String
+  public    String
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id           String   @id
+  sessionToken String   @unique
+  user         String   @db.VarChar(36)
+  expires      DateTime
+  User         User     @relation(fields: [user], references: [uuid], onDelete: Cascade)
+}
+
+model SlideShowContent {
+  id        String   @id
+  link      String
+  image     Int?
+  createdAt DateTime @default(now())
+  Media     Media?   @relation(fields: [image], references: [id], onUpdate: NoAction)
+}
+
+model Subscription {
+  id                Int                 @id @default(autoincrement())
+  user              String              @unique @db.VarChar(36)
+  plan              PlanTypeEnum        @default(Free)
+  startDate         DateTime
+  endDate           DateTime?
+  active            Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  amount            Int                 @default(0)
+  unit              String?             @db.VarChar(4)
+  discount          Int                 @default(0)
+  Billing           Billing[]
+  PlanConfiguration PlanConfiguration[]
+  CurrencyUnit      CurrencyUnit?       @relation(fields: [unit], references: [id], onUpdate: NoAction)
+  User              User                @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model Tag {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  description String?
+  slug        String  @unique
+}
+
+model Task {
+  id         Int            @id @default(autoincrement())
+  origin     TaskOriginEnum @default(Internal)
+  originName String?        @default("MATD")
+  action     String
+  request    Json?
+  startTime  DateTime?
+  endTime    DateTime?
+  createdAt  DateTime       @default(now())
+  TaskDetail TaskDetail[]
+}
+
+model TaskDetail {
+  id        String   @id @db.VarChar(36)
+  response  Json?
+  error     Boolean  @default(false)
+  task      Int
+  device    String   @db.VarChar(50)
+  createdAt DateTime @default(now())
+  Device    Device   @relation(fields: [device], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Task      Task     @relation(fields: [task], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model Transaction {
+  id           Int           @id @default(autoincrement())
+  amount       Int
+  description  String
+  organization Int?
+  farm         Int?
+  user         String?       @db.VarChar(36)
+  createdAt    DateTime      @default(now())
+  Expense      Expense[]
+  Income       Income[]
+  Farm         Farm?         @relation(fields: [farm], references: [id], onUpdate: NoAction)
+  Organization Organization? @relation(fields: [organization], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User         User?         @relation(fields: [user], references: [uuid], onUpdate: NoAction)
+}
+
+model User {
+  uuid                                                     String                         @id @db.VarChar(36)
+  email                                                    String                         @unique @db.VarChar(100)
+  emailVerified                                            DateTime?
+  password                                                 String?
+  name                                                     String?                        @db.VarChar(120)
+  phone                                                    String?                        @db.VarChar(20)
+  profileImage                                             Int?
+  systemRole                                               UserRoleEnum                   @default(User)
+  createdAt                                                DateTime                       @default(now())
+  birthdate                                                DateTime?
+  coverImage                                               Int?
+  gender                                                   GenderTypeEnum                 @default(None)
+  image                                                    String?
+  emailDisplay                                             String?                        @db.VarChar(100)
+  Account                                                  Account[]
+  Billing                                                  Billing[]
+  FarmMember                                               FarmMember[]
+  FarmMemberSetting                                        FarmMemberSetting[]
+  FarmMemberVerification_FarmMemberVerification_fromToUser FarmMemberVerification[]       @relation("FarmMemberVerification_fromToUser")
+  FarmMemberVerification_FarmMemberVerification_toToUser   FarmMemberVerification[]       @relation("FarmMemberVerification_toToUser")
+  Invoice                                                  Invoice[]
+  OrganizationMember                                       OrganizationMember[]
+  PinFarm                                                  PinFarm[]
+  PlantActivity                                            PlantActivity[]
+  QuotasAdjustHistory                                      QuotasAdjustHistory[]
+  ReportRequest                                            ReportRequest[]
+  Session                                                  Session[]
+  Subscription                                             Subscription?
+  Transaction                                              Transaction[]
+  Media_User_coverImageToMedia                             Media?                         @relation("User_coverImageToMedia", fields: [coverImage], references: [id], onUpdate: NoAction)
+  Media_User_profileImageToMedia                           Media?                         @relation("User_profileImageToMedia", fields: [profileImage], references: [id], onUpdate: NoAction)
+  UserMeta                                                 UserMeta[]
+  UserNotification                                         UserNotification[]
+  UserNotificationSubscription                             UserNotificationSubscription[]
+  UserVerification                                         UserVerification[]
+}
+
+model UserMeta {
+  key       String   @db.VarChar(50)
+  type      String   @db.VarChar(50)
+  value     String?  @db.VarChar(100)
+  user      String   @db.VarChar(36)
+  updatedAt DateTime
+  createdAt DateTime @default(now())
+  User      User     @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user, key])
+}
+
+model UserNotification {
+  id          String    @id
+  user        String    @db.VarChar(36)
+  title       String    @db.VarChar(120)
+  description String?
+  readedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  Image       Json      @default("[]")
+  data        Json      @default("{}")
+  farm        Int?
+  type        String?
+  plant       Int?
+  seen        Boolean   @default(false)
+  Farm        Farm?     @relation(fields: [farm], references: [id], onUpdate: NoAction)
+  Plant       Plant?    @relation(fields: [plant], references: [id], onUpdate: NoAction)
+  User        User      @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([farm])
+  @@index([user])
+}
+
+model UserNotificationSubscription {
+  user                        String                             @db.VarChar(36)
+  subscription                String
+  status                      NotificationSubscriptionStatusEnum @default(Active)
+  createdAt                   DateTime                           @default(now())
+  updatedAt                   DateTime
+  WebNotificationSubscription WebNotificationSubscription        @relation(fields: [subscription], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User                        User                               @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user, subscription])
+}
+
+model UserVerification {
+  token    String                   @id
+  data     Json
+  expires  DateTime
+  user     String                   @db.VarChar(36)
+  type     UserVerificationTypeEnum
+  used     DateTime?
+  verified DateTime?
+  User     User                     @relation(fields: [user], references: [uuid], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model WebNotificationSubscription {
+  id                           String                         @id
+  endpoint                     String
+  p256dh                       String
+  auth                         String
+  createdAt                    DateTime                       @default(now())
+  UserNotificationSubscription UserNotificationSubscription[]
+}
+
+enum ConditionEnum {
+  Equal
+  NotEqual
+  LessThan
+  MoreThan
+  Between
+}
+
+enum DeviceTypeEnum {
+  MASTER_BOARD
+  OUTPUT_MODULE
+  WEATHER_STATION
+  UNDEFINED
+  WIFI_SENSOR_UNIT
+  WIFI_WEATHER_STATION
+  WIFI_CONTROL_UNIT
+  WIFI_I2C_UNIT
+  WIFI_CAN_UNIT
+  WIFI_MODBUS485_UNIT
+  MASTER_MODULE
+  WIFI_UNIT_SENSOR
+  WIFI_UNIT_WEATHER_STATION
+  WIFI_UNIT_CONTROL
+  WIFI_UNIT_I2C
+  WIFI_UNIT_CAN
+  WIFI_UNIT_MODBUS485
+  WIFI_UNIT_WATER_LEVEL
+}
+
+enum DurationUnit {
+  Second
+  Minute
+  Hour
+}
+
+enum FarmMemberVerificationTypeEnum {
+  Invite
+}
+
+enum FarmTypeEnum {
+  GrowPlant
+  Livestock
+  Fishery
+}
+
+enum FirmwareUpdateStatusEnum {
+  Downloaded
+  DownloadFailed
+  Downloading
+  Idle
+}
+
+enum GenderTypeEnum {
+  Male
+  Female
+  None
+}
+
+enum KeyTypeEnum {
+  String
+  Boolean
+  Number
+  Json
+}
+
+enum LogicalOperatorEnum {
+  And
+  Or
+}
+
+enum MemberRoleEnum {
+  Owner
+  CanEdit
+  CanView
+}
+
+enum MeterValueTypeEnum {
+  INTERNAL
+  EXTERNAL
+}
+
+enum NotificationSubscriptionStatusEnum {
+  Active
+  Inactive
+}
+
+enum OperationEnum {
+  On
+  Off
+}
+
+enum OperationTypeEnum {
+  Manual
+  Auto
+}
+
+enum PlanTypeEnum {
+  Free
+  Pro
+  Business
+}
+
+enum PlantActivityStatusEnum {
+  Pending
+  Success
+}
+
+enum PlantActivityTypeEnum {
+  SoilQuality
+  Weather
+  StemQuality
+  StorePictures
+  Disease
+  Spray
+  Water
+  Fertilize
+  ControlTrigger
+  SensorAlert
+}
+
+enum PlantActivityWorkingTypeEnum {
+  Production
+  Experiment
+}
+
+enum PlantCropStatusEnum {
+  Process
+  Finish
+  Wait
+}
+
+enum PlantMoodTypeEnum {
+  Happy
+  Sad
+  Angry
+  Level1
+  Level2
+  Level3
+  Level4
+  Level5
+}
+
+enum PlantTypeEnum {
+  General
+  Natural
+  Organic
+}
+
+enum QuotasType {
+  Quota
+  SystemLimit
+}
+
+enum RegistrationStatusEnum {
+  Accepted
+  Pending
+  Rejected
+}
+
+enum ReportStatus {
+  Wait
+  Process
+  Success
+  Failed
+}
+
+enum ReportType {
+  InputModuleMeterValue
+}
+
+enum ScheduleAndConditionsStatusEnum {
+  Active
+  Inactive
+}
+
+enum ScheduleTypeEnum {
+  Day
+  Week
+  Minute
+  Hour
+  Custom
+}
+
+enum TaskOriginEnum {
+  Internal
+  External
+}
+
+enum UsageStatusEnum {
+  Activate
+  Deactivate
+}
+
+enum UserRoleEnum {
+  Administrator
   User
 }
 
-model Pond {
-  id        Int         @id @default(autoincrement())
-  name      String      @db.VarChar(100)
-  color     String?     @db.VarChar(10)
-  enabled   Boolean     @default(true)
-  order     Int         @default(0)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  entries   LogEntry[]
-  audits    LogAudit[]
-  staff     LogbookUserPond[]
-
-  @@index([enabled])
+enum UserVerificationTypeEnum {
+  VerifyEmail
+  ResetPassword
 }
 
-model LogEntry {
-  id           Int           @id @default(autoincrement())
-  pondId       Int
-  metric       LogMetricEnum
-  valueDecimal Decimal?      @db.Decimal(12, 4)
-  note         String?
-  recordedAt   DateTime      @default(now())
-  byName       String?       @db.VarChar(120)
-  byUserId     String?       @db.VarChar(36)
-  Pond         Pond          @relation(fields: [pondId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  audits       LogAudit[]
-
-  @@index([pondId])
-  @@index([metric])
-  @@index([recordedAt])
-}
-
-model LogAudit {
-  id               Int           @id @default(autoincrement())
-  pondId           Int
-  entryId          Int?
-  metric           LogMetricEnum
-  op               LogOpEnum
-  valueDecimal     Decimal?      @db.Decimal(12, 4)
-  note             String?
-  prevValueDecimal Decimal?      @db.Decimal(12, 4)
-  prevNote         String?
-  recordedAt       DateTime      @default(now())
-  byName           String?       @db.VarChar(120)
-  byUserId         String?       @db.VarChar(36)
-  Pond             Pond          @relation(fields: [pondId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  LogEntry         LogEntry?     @relation(fields: [entryId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-
-  @@index([pondId])
-  @@index([metric])
-  @@index([recordedAt])
-}
-
-model LogbookUser {
-  id           String             @id @default(uuid()) @db.VarChar(36)
-  username     String             @unique @db.VarChar(50)
-  passwordHash String             @db.VarChar(255)
-  nickname     String?            @db.VarChar(120)
-  avatarUrl    String?            @db.VarChar(512)
-  avatarIcon   String?            @db.VarChar(50)
-  role         LogbookRoleEnum    @default(User)
-  enabled      Boolean            @default(true)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  allowedPonds LogbookUserPond[]
-}
-
-model LogbookUserPond {
-  userId  String @db.VarChar(36)
-  pondId  Int
-  createdAt DateTime @default(now())
-  user    LogbookUser @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  pond    Pond        @relation(fields: [pondId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@id([userId, pondId])
-  @@index([pondId])
+enum WebNotificationSubscriptionType {
+  User
+  Farm
 }
