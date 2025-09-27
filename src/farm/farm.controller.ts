@@ -70,15 +70,19 @@ export class FarmController {
   }
 
   @Get('device')
-  async findDevice() {
+  async findDevice(@Query('plantId') plantIdQuery?: string) {
     const include: Prisma.DeviceInclude = {
       InputModule: true,
     };
-    const where: Prisma.DeviceWhereInput = {
-      Plant: {
-        id: 70,
-      },
-    };
+
+    // Resolve plantId from query or env (PLANT_ID); if not provided, don't filter by plant
+    const envPlantRaw = process.env.PLANT_ID;
+    const plantId = plantIdQuery ? Number(plantIdQuery) : (envPlantRaw ? Number(envPlantRaw) : undefined);
+    const hasPlant = Number.isFinite(plantId as number);
+
+    const where: Prisma.DeviceWhereInput = hasPlant
+      ? { Plant: { id: plantId as number } }
+      : {};
     const result = (await this.farmService.findAllDevice({
       where,
       include,

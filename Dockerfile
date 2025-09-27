@@ -26,6 +26,7 @@ COPY --from=builder /app/dist /app/dist
 COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/package.json /app/package.json
 
+
 # ตั้งค่า environment variable (ถ้าต้องการ)
 ENV NODE_ENV=production
 
